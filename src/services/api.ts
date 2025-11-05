@@ -23,17 +23,11 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle errors
+// Response interceptor - REMOVE the auto-logout on 401
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/auth/login';
-      }
-    }
+    // Don't automatically logout on 401 - let components handle it
     return Promise.reject(error);
   }
 );

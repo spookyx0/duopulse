@@ -2,37 +2,40 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [debugInfo, setDebugInfo] = useState('');
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
-  const { user, login, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  // Debug: Check if user is logged in
+  // Check if user is already logged in
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-    
-    setDebugInfo(`
-      Token exists: ${!!token}
-      User exists: ${!!savedUser}
-      Auth loading: ${authLoading}
-      User state: ${user ? 'Logged in' : 'Not logged in'}
-      Current path: ${window.location.pathname}
-    `);
-    
-    // If user is already logged in, redirect to dashboard
-    if (user && !authLoading) {
-      console.log('User already logged in, redirecting to dashboard');
-      router.push('/dashboard');
-    }
-  }, [user, authLoading, router]);
+    const checkAuth = () => {
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+      
+      console.log('🔐 Login page auth check:', { 
+        token: !!token, 
+        user: !!user 
+      });
+      
+      if (token && user) {
+        console.log('✅ User already logged in, redirecting to dashboard');
+        // Use window.location for hard redirect
+        window.location.href = '/dashboard';
+        return;
+      }
+      
+      setIsCheckingAuth(false);
+    };
+
+    // Delay the check to ensure everything is loaded
+    setTimeout(checkAuth, 100);
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,26 +43,62 @@ export default function Login() {
     setError('');
 
     try {
-      console.log('Starting login process...');
-      await login(email, password);
-      console.log('Login successful, checking user state...');
+      console.log('🚀 Starting login process...');
       
-      // Wait a moment for state to update, then redirect
-      setTimeout(() => {
-        console.log('Redirecting to dashboard...');
-        router.push('/dashboard');
-      }, 100);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Login failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Login API response:', data);
+      
+      // Store auth data
+      localStorage.setItem('token', data.access_token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      
+      console.log('💾 Auth data stored in localStorage');
+      console.log('Token stored:', !!data.access_token);
+      console.log('User stored:', !!data.user);
+      
+      // Wait a moment to ensure storage is complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Verify storage
+      const storedToken = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      
+      console.log('🔍 Storage verification:', {
+        token: !!storedToken,
+        user: !!storedUser
+      });
+      
+      if (!storedToken || !storedUser) {
+        throw new Error('Failed to store authentication data');
+      }
+      
+      // Use hard redirect to avoid React state issues
+      console.log('🔄 Redirecting to dashboard...');
+      window.location.href = '/dashboard';
       
     } catch (err: any) {
-      console.error('Login error:', err);
+      console.error('❌ Login error:', err);
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Show loading state while checking auth
-  if (authLoading) {
+  // Show loading while checking authentication
+  if (isCheckingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -80,20 +119,7 @@ export default function Login() {
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Sign in to your account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Use demo credentials below
-          </p>
         </div>
-        
-        {/* Debug Info - Remove in production */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-            <h3 className="text-sm font-medium text-yellow-800">Debug Info</h3>
-            <pre className="text-xs text-yellow-700 mt-2 whitespace-pre-wrap">
-              {debugInfo}
-            </pre>
-          </div>
-        )}
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
@@ -150,6 +176,16 @@ export default function Login() {
             </div>
           </div>
         </form>
+
+        {/* Debug Info */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+          <h3 className="text-sm font-medium text-yellow-800">Debug Info</h3>
+          <div className="text-xs text-yellow-700 mt-2 space-y-1">
+            <p>Backend: {process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}</p>
+            <p>Token in storage: {localStorage.getItem('token') ? 'YES' : 'NO'}</p>
+            <p>User in storage: {localStorage.getItem('user') ? 'YES' : 'NO'}</p>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { api, apiService } from '@/services/api';
 
 export interface User {
   id: number;
@@ -12,103 +11,80 @@ export interface User {
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
-  const [partner, setPartner] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check for existing auth on component mount
+    const checkAuth = () => {
+      try {
+        const token = localStorage.getItem('token');
+        const userData = localStorage.getItem('user');
+        
+        console.log('🔐 Auth check - Token:', !!token, 'User:', !!userData);
+        
+        if (token && userData) {
+          const parsedUser = JSON.parse(userData);
+          setUser(parsedUser);
+          console.log('✅ User authenticated:', parsedUser.name);
+        } else {
+          console.log('❌ No auth data found');
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     checkAuth();
   }, []);
 
-  const checkAuth = async () => {
+  const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      if (typeof window === 'undefined') return;
-
-      const token = localStorage.getItem('token');
-      const savedUser = localStorage.getItem('user');
+      console.log('🚀 Login attempt for:', email);
       
-      if (token && savedUser) {
-        api.defaults.headers.Authorization = `Bearer ${token}`;
-        const userData = JSON.parse(savedUser);
-        setUser(userData);
-        
-        // Try to fetch partner data, but don't fail if it doesn't work
-        try {
-          await fetchPartner();
-        } catch (partnerError) {
-          console.warn('Failed to fetch partner data:', partnerError);
-        }
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Login failed: ${response.status}`);
       }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      // Don't logout here, just clear the error
-      setError('Authentication check failed');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const fetchPartner = async () => {
-    try {
-      const response = await apiService.users.getPartner();
-      setPartner(response.data);
-    } catch (error) {
-      console.error('Failed to fetch partner:', error);
-      throw error;
-    }
-  };
-
-  const login = async (email: string, password: string): Promise<void> => {
-    try {
-      setError(null);
-      console.log('Attempting login with:', email);
+      const data = await response.json();
+      console.log('✅ Login successful:', data.user);
       
-      const response = await api.post('/auth/login', { email, password });
-      console.log('Login response:', response.data);
-      
-      const { access_token, user: userData } = response.data;
-      
-      // Store auth data
-      localStorage.setItem('token', access_token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      
-      // Set authorization header for future requests
-      api.defaults.headers.Authorization = `Bearer ${access_token}`;
+      // Store in localStorage
+      localStorage.setItem('token', data.access_token);
+      localStorage.setItem('user', JSON.stringify(data.user));
       
       // Update state
-      setUser(userData);
+      setUser(data.user);
       
-      // Try to fetch partner data
-      try {
-        await fetchPartner();
-      } catch (partnerError) {
-        console.warn('Partner fetch failed, but login successful:', partnerError);
-      }
-      
+      return true;
     } catch (error: any) {
-      console.error('Login error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Login failed';
-      setError(errorMessage);
-      throw new Error(errorMessage);
+      console.error('❌ Login error:', error);
+      throw new Error(error.message || 'Login failed');
     }
   };
 
   const logout = (): void => {
+    console.log('👋 Logging out...');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
-    setPartner(null);
-    setError(null);
-    delete api.defaults.headers.Authorization;
   };
 
   return {
     user,
-    partner,
     login,
     logout,
-    loading,
-    error,
-    refreshPartner: fetchPartner
+    loading
   };
 }

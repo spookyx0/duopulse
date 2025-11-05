@@ -5,7 +5,7 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'DuoPulse - Shared Activity Monitoring',
+  title: 'DuoPulse',
   description: 'Activity monitoring system for two users with real-time chat and task management',
 }
 
