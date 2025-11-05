@@ -1,0 +1,5 @@
+node_modules
+.env.local
+.env
+start-backend.bat
+start-frontend.bat
