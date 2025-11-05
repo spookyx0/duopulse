@@ -1,29 +1,21 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { useAuth } from '@/hooks/useAuth';
-import { socketService } from '@/services/socket';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const { user } = useAuth();
+  const { user, partner } = useAuth();
 
-  useEffect(() => {
-    if (user) {
-      // Connect to WebSocket when user is authenticated
-      socketService.connect(user.id);
-    }
-
-    return () => {
-      // Cleanup on unmount
-      socketService.removeAllListeners();
-    };
-  }, [user]);
+  // Don't render layout if not authenticated - let individual pages handle redirects
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
