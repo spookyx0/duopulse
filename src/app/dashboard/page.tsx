@@ -28,7 +28,7 @@ export default function Dashboard() {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    // Only redirect if we've confirmed the user is not logged in
+
     if (!authLoading && !user && authChecked) {
       console.log('No user found, redirecting to login');
       router.push('/auth/login');
@@ -56,7 +56,6 @@ export default function Dashboard() {
     try {
       setRefreshing(true);
       
-      // Fetch all data in parallel
       const [tasksRes, thoughtsRes, eventsRes, chatRes] = await Promise.all([
         apiService.tasks.getAll(),
         apiService.thoughts.getPinned(),
